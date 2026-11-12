@@ -1,0 +1,124 @@
+================================================================
+1. TERMINAL 1 — BACKEND SETUP
+================================================================
+mkdir -p blood-bank/backend && cd blood-bank/backend
+npm init -y
+npm install express mongoose cors
+node server.js
+
+================================================================
+2. TERMINAL 2 — FRONTEND SETUP
+================================================================
+cd blood-bank
+npm create vite@latest frontend -- --template react
+cd frontend
+npm install
+npm run dev
+
+================================================================
+3. BACKEND CODE (backend/server.js)
+================================================================
+const express = require('express');
+const mongoose = require('mongoose');
+const cors = require('cors');
+
+const app = express();
+app.use(cors());
+app.use(express.json());
+
+mongoose.connect('mongodb://127.0.0.1:27017/bloodbank')
+  .then(() => console.log('MongoDB Connected'))
+  .catch(err => console.log(err));
+
+const Donor = mongoose.model('Donor', new mongoose.Schema({
+  name: String,
+  bloodGroup: String,
+  contact: String,
+  city: String
+}));
+
+app.get('/api/donors', async (req, res) => {
+  res.json(await Donor.find());
+});
+
+app.post('/api/donors', async (req, res) => {
+  const donor = await Donor.create(req.body);
+  res.json(donor);
+});
+
+app.delete('/api/donors/:id', async (req, res) => {
+  await Donor.findByIdAndDelete(req.params.id);
+  res.json({ deleted: true });
+});
+
+app.listen(5000, () => console.log('Server running on port 5000'));
+
+================================================================
+4. FRONTEND CODE (frontend/src/App.jsx)
+================================================================
+import { useState, useEffect } from 'react';
+
+export default function App() {
+  const [donors, setDonors] = useState([]);
+  const [form, setForm] = useState({ name: '', bloodGroup: '', contact: '', city: '' });
+  const [copiedId, setCopiedId] = useState(null);
+  const API = 'http://localhost:5000/api/donors';
+
+  const loadDonors = async () => {
+    const res = await fetch(API);
+    setDonors(await res.json());
+  };
+
+  useEffect(() => { loadDonors(); }, []);
+
+  const addDonor = async (e) => {
+    e.preventDefault();
+    await fetch(API, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(form)
+    });
+    setForm({ name: '', bloodGroup: '', contact: '', city: '' });
+    loadDonors();
+  };
+
+  const deleteDonor = async (id) => {
+    await fetch(`${API}/${id}`, { method: 'DELETE' });
+    loadDonors();
+  };
+
+  const copyDonor = (d) => {
+    navigator.clipboard.writeText(`${d.name} (${d.bloodGroup}) - ${d.city} | ${d.contact}`);
+    setCopiedId(d._id);
+    setTimeout(() => setCopiedId(null), 1500);
+  };
+
+  return (
+    <div style={{ maxWidth: '500px', margin: '30px auto', fontFamily: 'sans-serif' }}>
+      <h2>Blood Bank Donor Share</h2>
+      <form onSubmit={addDonor} style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+        <input placeholder="Donor Name" required value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
+        <input placeholder="Blood Group (e.g. O+)" required value={form.bloodGroup} onChange={e => setForm({ ...form, bloodGroup: e.target.value })} />
+        <input placeholder="Phone / Contact" required value={form.contact} onChange={e => setForm({ ...form, contact: e.target.value })} />
+        <input placeholder="City / Hospital" required value={form.city} onChange={e => setForm({ ...form, city: e.target.value })} />
+        <button type="submit" style={{ background: '#c62828', color: '#fff', padding: '8px', border: 'none' }}>Register Donor</button>
+      </form>
+
+      <div style={{ marginTop: '20px' }}>
+        {donors.map(d => (
+          <div key={d._id} style={{ border: '1px solid #ccc', padding: '10px', marginBottom: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div>
+              <strong>{d.name} ({d.bloodGroup})</strong>
+              <div>{d.city} | 📞 {d.contact}</div>
+            </div>
+            <div style={{ display: 'flex', gap: '6px' }}>
+              <button onClick={() => copyDonor(d)}>{copiedId === d._id ? 'Copied!' : 'Copy'}</button>
+              <button onClick={() => deleteDonor(d._id)}>Remove</button>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+```[span_1](start_span)[span_1](end_span)
